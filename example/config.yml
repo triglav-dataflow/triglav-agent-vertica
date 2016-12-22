@@ -4,10 +4,10 @@ serverengine:
   log_rotate_age: 5
   log_rotate_size: 10485760
 triglav:
-  url: <%= ENV['TRIGLAV_URL'] %>
+  url: <%= ENV['TRIGLAV_URL'] || 'http://localhost:7800' %>
   credential:
-    username: <%= ENV['TRIGLAV_USERNAME'] %>
-    password: <%= ENV['TRIGLAV_PASSWORD'] %>
+    username: <%= ENV['TRIGLAV_USERNAME'] || 'triglav_test' %>
+    password: <%= ENV['TRIGLAV_PASSWORD'] || 'triglav_test' %>
     authenticator: local
 vertica:
   watch_interval: 5

@@ -110,18 +110,15 @@ This section is the special section for triglav-agent-vertica.
 
 ## Development
 
-Prepare .env file
+### Prepare
 
 ```
-TRIGLAV_URL=http://localhost:3000
-TRIGLAV_USERNAME=triglav_test
-TRIGLAV_PASSWORD=triglav_test
-VERTICA_HOST=xxx.xxx.xxx.xxx
-VERTICA_PORT=5433
-VERTICA_DATABASE=xxxx
-VERTICA_USER=xxxx
-VERTICA_PASSWORD=xxxx
+./prepare.sh
 ```
+
+Edit .env file.
+
+### Start
 
 Start up triglav api on localhost.
 

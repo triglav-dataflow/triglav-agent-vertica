@@ -10,7 +10,7 @@ triglav:
     password: <%= ENV['TRIGLAV_PASSWORD'] || 'triglav_test' %>
     authenticator: local
 vertica:
-  watch_interval: 5
+  watcher_interval: 5
   date_column: d
   timestamp_column: t
   connection_info:

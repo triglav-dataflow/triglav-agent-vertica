@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{Triglav Agent for Vertica.}
   spec.description   = %q{Triglav Agent for Vertica.}
-  spec.homepage      = "https://github.com/triglav-workflow/triglav-agent-vertica"
+  spec.homepage      = "https://github.com/triglav-dataflow/triglav-agent-vertica"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }

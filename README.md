@@ -43,42 +43,14 @@ Usage: triglav-agent-vertica [options]
 Run as:
 
 ```
-bundle exec triglav-agent-vertica --dotenv -c config.yml
+TRIGLAV_ENV=development bundle exec triglav-agent-vertica --dotenv -c config.yml
 ```
 
 ## Configuration
 
-Prepare config.yml as:
+Prepare config.yml as [example/config.yml](./example/config.yml).
 
-```yaml
-serverengine:
-  log: 'STDOUT'
-  log_level: 'debug'
-  log_rotate_age: 5
-  log_rotate_size: 10485760
-triglav:
-  url: <%= ENV['TRIGLAV_URL'] %>
-  credential:
-    username: <%= ENV['TRIGLAV_USERNAME'] %>
-    password: <%= ENV['TRIGLAV_PASSWORD'] %>
-    authenticator: local
-vertica:
-  watcher_interval: 60
-  date_column: d
-  timestamp_column: t
-  connection_info:
-    "vertica://":
-      host: <%= ENV['VERTICA_HOST'] %>
-      port: <%= ENV['VERTICA_PORT'] %>
-      database: <%= ENV['VERTICA_DATABASE'] %>
-      user: <%= ENV['VERTICA_USER'] %>
-      password: <%= ENV['VERTICA_PASSWORD'] %>
-      resource_pool: <%= ENV['VERTICA_RESOURCE_POOL'] %>
-      interruptable: true
-      read_timeout: 5
-```
-
-You can use erb template. You may load environment variables from .env file with `--dotenv` option as an [example](./example/example.env) file shows.
+You can use erb template. You may load environment variables from .env file with `--dotenv` option as an [example/example.env](./example/example.env) file shows.
 
 ### serverengine section
 
@@ -116,7 +88,7 @@ This section is the special section for triglav-agent-vertica.
 ./prepare.sh
 ```
 
-Edit .env file.
+Edit `.env` or `config.yml` file directly.
 
 ### Start
 
@@ -125,7 +97,7 @@ Start up triglav api on localhost.
 Run triglav-anget-vertica as:
 
 ```
-bundle exec triglav-agent-vertica --dotenv -c example/config.yml --debug
+TRIGLAV_ENV=development bundle exec triglav-agent-vertica --dotenv --debug
 ```
 
 The debug mode with --debug option ignores the `last_epoch` value in status file.

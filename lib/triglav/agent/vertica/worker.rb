@@ -22,7 +22,7 @@ module Triglav::Agent
       end
 
       def process
-        $logger.debug { "Start Worker#process worker_id:#{worker_id}" }
+        $logger.info { "Start Worker#process worker_id:#{worker_id}" }
         api_client = ApiClient.new # renew connection
 
         # It is possible to seperate agent process by prefixes of resource uris

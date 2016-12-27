@@ -4,15 +4,18 @@ require 'triglav/agent/vertica/connection'
 module Triglav::Agent
   module Vertica
     module Worker
+      # serverengine interface
       def initialize
         @timer = Timer.new
       end
 
+      # serverengine interface
       def reload
         $logger.info { "Worker#reload worker_id:#{worker_id}" }
         $setting.reload
       end
 
+      # serverengine interface
       def run
         $logger.info { "Worker#run worker_id:#{worker_id}" }
         start
@@ -28,18 +31,17 @@ module Triglav::Agent
         # It is possible to seperate agent process by prefixes of resource uris
         count = 0
         resource_uri_prefixes.each do |resource_uri_prefix|
-          # list_aggregated_resources returns unique resources which we have to monitor
-          if aggregated_resources = api_client.list_aggregated_resources(resource_uri_prefix)
-            $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} aggregated_resources.size:#{aggregated_resources.size}" }
-            connection = Connection.new(get_connection_info(resource_uri_prefix))
-            watcher = Watcher.new(connection)
-            aggregated_resources.each do |resource|
-              break if stopped?
-              count += 1
-              watcher.process(resource) {|events| api_client.send_messages(events) }
-            end
-          end
           break if stopped?
+          # list_aggregated_resources returns unique resources which we have to monitor
+          next unless aggregated_resources = api_client.list_aggregated_resources(resource_uri_prefix)
+          $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} aggregated_resources.size:#{aggregated_resources.size}" }
+          connection = Connection.new(get_connection_info(resource_uri_prefix))
+          watcher = Watcher.new(connection)
+          aggregated_resources.each do |resource|
+            break if stopped?
+            count += 1
+            watcher.process(resource) {|events| api_client.send_messages(events) }
+          end
         end
         $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count}" }
       end
@@ -49,6 +51,7 @@ module Triglav::Agent
         @stop = false
       end
 
+      # serverengine interface
       def stop
         $logger.info { "Worker#stop worker_id:#{worker_id}" }
         @stop = true

@@ -41,7 +41,7 @@ module Triglav::Agent
           end
           break if stopped?
         end
-        $logger.info { "End Worker#process worker_id:#{worker_id} count:#{count}" }
+        $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count}" }
       end
 
       def start

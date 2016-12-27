@@ -13,14 +13,14 @@ module Triglav::Agent::Vertica
     end
 
     def process(resource)
-      events = get_events(resource, last_epoch: $setting.debug? ? 0 : nil)
+      last_epoch = get_last_epoch(resource)
+      $logger.debug { "Start process #{resource.uri}, last_epoch:#{last_epoch}" }
+      events, new_last_epoch = get_events(resource, last_epoch: $setting.debug? ? 0 : last_epoch)
+      $logger.debug { "Finish process #{resource.uri}, last_epoch:#{last_epoch}, new_last_epoch:#{new_last_epoch}" }
       return if events.nil? || events.empty?
       yield(events) # send_message
-      Triglav::Agent::StorageFile.open($setting.status_file) do |fp|
-        @status = fp.load # reload during locking
-        events.each {|event| update_status(event) }
-        fp.dump(@status)
-      end
+      update_status_file(resource, new_last_epoch)
+      [events, new_last_epoch]
     end
 
     # @param [TriglavClient::ResourceResponse] resource
@@ -29,8 +29,8 @@ module Triglav::Agent::Vertica
     #   unit: 'daily' or 'hourly', or 'daily,hourly'
     #   timezone: '+09:00'
     #   span_in_days: 32
-    # @param [Ineger] last_epoch (for debug)
-    def get_events(resource, last_epoch: nil)
+    # @param [Ineger] last_epoch
+    def get_events(resource, last_epoch:)
       if !%w[daily hourly daily,hourly].include?(resource.unit) ||
           resource.timezone.nil? || resource.span_in_days.nil?
         $logger.warn { "Broken resource: #{resource.to_s}" }
@@ -81,7 +81,9 @@ module Triglav::Agent::Vertica
           daily_events = build_daily_events_from_hourly(result, resource)
           events.concat(daily_events)
         end
-        events
+
+        new_last_epoch = latest_epoch || last_epoch
+        [events, new_last_epoch]
       rescue Vertica::Error::QueryError => e
         $logger.warn { "#{e.class} #{e.message}" }
         nil
@@ -89,6 +91,10 @@ module Triglav::Agent::Vertica
     end
 
     private
+
+    def latest_epoch(result)
+      result.map {|row| row[2] }.max
+    end
 
     def build_events(result, resource, unit = resource.unit)
       result.map do |row|
@@ -124,12 +130,24 @@ module Triglav::Agent::Vertica
       Time.strptime("#{date.to_s} #{hour.to_i} #{timezone}", '%Y-%m-%d %H %z').to_i
     end
 
-    def update_status(event)
-      (@status[:last_epoch] ||= {})[event[:resource_uri].to_sym] = event.dig(:payload, :epoch)
+    def update_status_file(resource, last_epoch)
+      Triglav::Agent::StorageFile.open($setting.status_file) do |fp|
+        @status = fp.load # reload during locking
+        update_status(resource, last_epoch)
+        fp.dump(@status)
+      end
     end
 
-    def get_last_epoch(resource_uri)
-      @status.dig(:last_epoch, resource_uri.to_sym) || get_current_epoch
+    def update_status(resource, last_epoch)
+      (@status[:last_epoch] ||= {})[resource.uri.to_sym] = last_epoch
+    end
+
+    def get_last_epoch(resource)
+      unless last_epoch = @status.dig(:last_epoch, resource.uri.to_sym)
+        last_epoch = get_current_epoch
+        update_status_file(resource, last_epoch)
+      end
+      last_epoch
     end
 
     def get_current_epoch

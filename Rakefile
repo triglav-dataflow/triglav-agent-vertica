@@ -1,5 +1,4 @@
 require "bundler/gem_tasks"
-require "rspec/core/rake_task"
 
 require 'rake/testtask'
 desc 'Run test_unit based test'

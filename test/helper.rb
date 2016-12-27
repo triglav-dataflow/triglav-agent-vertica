@@ -4,11 +4,11 @@ require 'test/unit'
 require 'test/unit/rr'
 require 'pry'
 require 'timecop'
-require 'triglav-agent-vertica'
-require 'triglav/agent/vertica/configuration'
+require 'triglav/agent/vertica'
 
 TEST_ROOT = __dir__
 ROOT = File.dirname(__dir__)
+ENV['APP_ENV'] = 'test'
 
 opts = {
   config: File.join(TEST_ROOT, 'config.yml'),

@@ -8,8 +8,8 @@ Triglav Agent for Vertica
 
 ## Prerequisites
 
-* Vertica table must have a DATE column for `daily` resource watcher
-* Vertica table must have a TIMESTAMP or TIMESTAMPTZ column for `hourly` resource watcher
+* Vertica table must have a DATE column for `daily` resource monitor
+* Vertica table must have a TIMESTAMP or TIMESTAMPTZ column for `hourly` resource monitor
 
 ## Installation
 
@@ -66,7 +66,7 @@ The access token obtained is stored into a token storage file (--token option).
 
 This section is the special section for triglav-agent-vertica.
 
-* **watcher_interval**: The interval to watch tables (number, default: 60)
+* **monitor_interval**: The interval to watch tables (number, default: 60)
 * **connection_info**: key-value pairs of vertica connection info where keys are resource URI pattern in regular expression, and values are connection infomation
 
 ## How it behaves
@@ -75,7 +75,7 @@ This section is the special section for triglav-agent-vertica.
   * Store the access token into the token storage file
   * Read the token from the token storage file next time
   * Refresh the access token if it is expired
-2. Repeat followings in `watcher_interval` seconds:
+2. Repeat followings in `monitor_interval` seconds:
 3. Obtain resource (table) lists of the specified prefix (keys of connection_info) from triglav.
 4. Connect to vertica with an appropriate connection info for a resource uri, and find tables which are newer than last check.
 5. Store checking information into the status storage file for the next time check.

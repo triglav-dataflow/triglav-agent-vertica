@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'helper'
-require 'triglav/agent/vertica/watcher'
+require 'triglav/agent/vertica/monitor'
 
 # This test requires a real connection to vertica, now
 # Configure .env to set proper connection_info of test/config.yml
@@ -15,7 +15,7 @@ require 'triglav/agent/vertica/watcher'
 # VERTICA_USER=dbread
 # VERTICA_PASSWORD=xxxxxxx
 if File.exist?(File.join(ROOT, '.env'))
-  class TestWatcher < Test::Unit::TestCase
+  class TestMonitor < Test::Unit::TestCase
     def build_resource(params = {})
       TriglavClient::ResourceResponse.new({
         uri: 'vertica://localhost/vdb/mobage_jp_12019106/raw_log_010101',
@@ -35,15 +35,15 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_process
       resource = build_resource
-      watcher = Triglav::Agent::Vertica::Watcher.new(connection)
-      events, new_last_epoch = watcher.process(resource)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
+      events, new_last_epoch = monitor.process(resource)
       assert { events != nil}
     end
 
     def test_get_events_hourly
       resource = build_resource(unit: 'hourly')
-      watcher = Triglav::Agent::Vertica::Watcher.new(connection)
-      events, new_last_epoch = watcher.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
+      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
       assert { events != nil}
       assert { events.size > resource.span_in_days * 24 }
       event = events.first
@@ -55,8 +55,8 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_events_daily
       resource = build_resource(unit: 'daily')
-      watcher = Triglav::Agent::Vertica::Watcher.new(connection)
-      events, new_last_epoch = watcher.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
+      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
       assert { events != nil}
       assert { events.size <= resource.span_in_days }
       event = events.first
@@ -68,8 +68,8 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_events_daily_hourly
       resource = build_resource(unit: 'daily,hourly')
-      watcher = Triglav::Agent::Vertica::Watcher.new(connection)
-      events, new_last_epoch = watcher.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
+      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
       assert { events != nil}
       assert { events.size <= resource.span_in_days * 24 + 2 }
       assert { events.first[:resource_unit] == 'hourly' }

@@ -1,4 +1,4 @@
-require 'triglav/agent/vertica/watcher'
+require 'triglav/agent/vertica/monitor'
 require 'triglav/agent/vertica/connection'
 
 module Triglav::Agent
@@ -20,7 +20,7 @@ module Triglav::Agent
         $logger.info { "Worker#run worker_id:#{worker_id}" }
         start
         until @stop
-          @timer.wait(watcher_interval) { process }
+          @timer.wait(monitor_interval) { process }
         end
       end
 
@@ -36,11 +36,11 @@ module Triglav::Agent
           next unless aggregated_resources = api_client.list_aggregated_resources(resource_uri_prefix)
           $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} aggregated_resources.size:#{aggregated_resources.size}" }
           connection = Connection.new(get_connection_info(resource_uri_prefix))
-          watcher = Watcher.new(connection)
+          monitor = Monitor.new(connection)
           aggregated_resources.each do |resource|
             break if stopped?
             count += 1
-            watcher.process(resource) {|events| api_client.send_messages(events) }
+            monitor.process(resource) {|events| api_client.send_messages(events) }
           end
         end
         $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count}" }
@@ -64,8 +64,8 @@ module Triglav::Agent
 
       private
 
-      def watcher_interval
-        $setting.dig(:vertica, :watcher_interval) || 60
+      def monitor_interval
+        $setting.dig(:vertica, :monitor_interval) || 60
       end
 
       def resource_uri_prefixes

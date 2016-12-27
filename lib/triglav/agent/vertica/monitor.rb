@@ -3,7 +3,7 @@ require 'vertica'
 require 'uri'
 
 module Triglav::Agent::Vertica
-  class Watcher
+  class Monitor
     attr_reader :connection
 
     def initialize(connection)

@@ -35,15 +35,14 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_process
       resource = build_resource
-      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
-      events, new_last_epoch = monitor.process(resource)
-      assert { events != nil}
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource)
+      assert_nothing_raised { monitor.process }
     end
 
     def test_get_events_hourly
       resource = build_resource(unit: 'hourly')
-      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
-      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
+      events, new_last_epoch = monitor.get_events
       assert { events != nil}
       assert { events.size > resource.span_in_days * 24 }
       event = events.first
@@ -55,8 +54,8 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_events_daily
       resource = build_resource(unit: 'daily')
-      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
-      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
+      events, new_last_epoch = monitor.get_events
       assert { events != nil}
       assert { events.size <= resource.span_in_days }
       event = events.first
@@ -68,8 +67,8 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_events_daily_hourly
       resource = build_resource(unit: 'daily,hourly')
-      monitor = Triglav::Agent::Vertica::Monitor.new(connection)
-      events, new_last_epoch = monitor.get_events(resource, last_epoch: 0)
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
+      events, new_last_epoch = monitor.get_events
       assert { events != nil}
       assert { events.size <= resource.span_in_days * 24 + 2 }
       assert { events.first[:resource_unit] == 'hourly' }

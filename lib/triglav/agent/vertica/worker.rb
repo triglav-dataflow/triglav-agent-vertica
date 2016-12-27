@@ -33,14 +33,14 @@ module Triglav::Agent
         resource_uri_prefixes.each do |resource_uri_prefix|
           break if stopped?
           # list_aggregated_resources returns unique resources which we have to monitor
-          next unless aggregated_resources = api_client.list_aggregated_resources(resource_uri_prefix)
-          $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} aggregated_resources.size:#{aggregated_resources.size}" }
+          next unless resources = api_client.list_aggregated_resources(resource_uri_prefix)
+          $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} resources.size:#{resources.size}" }
           connection = Connection.new(get_connection_info(resource_uri_prefix))
-          monitor = Monitor.new(connection)
-          aggregated_resources.each do |resource|
+          resources.each do |resource|
             break if stopped?
             count += 1
-            monitor.process(resource) {|events| api_client.send_messages(events) }
+            monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
+            monitor.process {|events| api_client.send_messages(events) }
           end
         end
         $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count}" }

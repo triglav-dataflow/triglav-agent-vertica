@@ -10,6 +10,8 @@ defaults: &defaults
       username: <%= ENV['TRIGLAV_USERNAME'] || 'triglav_test' %>
       password: <%= ENV['TRIGLAV_PASSWORD'] || 'triglav_test' %>
       authenticator: local
+    timeout: 60
+    debugging: false
   vertica:
     monitor_interval: 5
     date_column: d

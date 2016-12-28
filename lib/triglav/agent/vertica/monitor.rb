@@ -74,7 +74,10 @@ module Triglav::Agent::Vertica
       new_last_epoch = latest_epoch(rows)
       [events, new_last_epoch]
     rescue Vertica::Error::QueryError => e
-      $logger.warn { "#{e.class} #{e.message}" }
+      $logger.warn { "#{e.class} #{e.message}" } # e.message includes sql
+      nil
+    rescue Vertica::Error::TimedOutError => e
+      $logger.warn { "#{e.class} #{e.message} SQL:#{sql}" }
       nil
     end
 

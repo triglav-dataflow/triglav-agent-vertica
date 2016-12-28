@@ -32,7 +32,7 @@ module Triglav::Agent::Vertica
       $logger.debug { "Finish process #{resource.uri}, last_epoch:#{last_epoch}, new_last_epoch:#{new_last_epoch}" }
       return if events.nil? || events.empty?
       yield(events) # send_message
-      update_status_file(resource, new_last_epoch)
+      update_status_file(new_last_epoch)
     end
 
     def get_events

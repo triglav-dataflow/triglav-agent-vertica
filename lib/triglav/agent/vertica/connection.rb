@@ -20,7 +20,12 @@ module Triglav::Agent::Vertica
       connection_info = @connection_info.dup
       connection_info.delete(:resource_pool)
       connection_info.delete(:memorycap)
-      @connection = Vertica.connect(connection_info)
+      begin
+        @connection = Vertica.connect(connection_info)
+      rescue => e
+        $logger.error { "Failed to connect #{connection_info[:host]}:#{connection_info[:port]} with #{connection_info[:user]}" }
+        raise e
+      end
       $logger.info { "Connected to #{connection_info[:host]}:#{connection_info[:port]}" }
       set_resource_pool
       set_memorycap

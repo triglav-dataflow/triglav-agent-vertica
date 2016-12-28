@@ -29,6 +29,7 @@ module Triglav::Agent
       end
 
       def process
+        started = Time.now
         $logger.info { "Start Worker#process worker_id:#{worker_id}" }
         api_client = ApiClient.new # renew connection
 
@@ -47,7 +48,8 @@ module Triglav::Agent
             monitor.process {|events| api_client.send_messages(events) }
           end
         end
-        $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count}" }
+        elapsed = Time.now - started
+        $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count} elapsed:#{elapsed.to_f}sec" }
       end
 
       def start

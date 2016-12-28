@@ -22,6 +22,10 @@ module Triglav::Agent
         until @stop
           @timer.wait(monitor_interval) { process }
         end
+      rescue => e
+        # ServerEngine.dump_uncaught_error does not tell me e.class
+        $logger.error { "#{e.class} #{e.message} #{e.backtrace.join("\\n")}" } # one line
+        raise e
       end
 
       def process

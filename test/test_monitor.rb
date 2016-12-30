@@ -117,5 +117,36 @@ if File.exist?(File.join(ROOT, '.env'))
       end
       assert { success }
     end
+
+    # Value specification:
+    # * A value looks like an integer string is treated as an integer.
+    # * If you want to treat it as as string, surround with double quote or single quote.
+    # * A value does not look like an integer is treated as a string.
+    # Operator specification:
+    # * Only equality is supported now
+    def test_query_conditions
+      resource = build_resource(
+        uri: "vertica://localhost/vdb/#{schema}/#{table}?id=0&uuid='0'&d=2016-12-30"
+      )
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
+      q_conditions = monitor.send(:q_conditions)
+      assert { q_conditions == %Q["id" = 0 AND "uuid" = '0' AND "d" = '2016-12-30'] }
+    end
+
+    def test_get_events_with_query_conditions
+      resource = build_resource(
+        unit: 'singular,daily,hourly',
+        uri: "vertica://localhost/vdb/#{schema}/#{table}?id=0&uuid='0'"
+      )
+      monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
+      success = monitor.process do |events|
+        assert { events != nil}
+        assert { events.size == 3 }
+        assert { events.any? {|e| e[:resource_unit] == 'hourly' } }
+        assert { events.any? {|e| e[:resource_unit] == 'daily' } }
+        assert { events.any? {|e| e[:resource_unit] == 'singular' } }
+      end
+      assert { success }
+    end
   end
 end

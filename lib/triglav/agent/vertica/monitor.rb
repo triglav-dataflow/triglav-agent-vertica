@@ -128,7 +128,7 @@ module Triglav::Agent::Vertica
           resource_unit: query_unit,
           resource_time: date_hour_to_i(date, hour, resource.timezone),
           resource_timezone: resource.timezone,
-          payload: {epoch: epoch},
+          payload: {d: date, h: hour, epoch: epoch}.to_json,
         }
       end
     end

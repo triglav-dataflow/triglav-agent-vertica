@@ -1,6 +1,7 @@
 require 'triglav/agent/vertica/connection'
 require 'vertica'
 require 'uri'
+require 'cgi'
 
 module Triglav::Agent::Vertica
   class Monitor
@@ -78,8 +79,9 @@ module Triglav::Agent::Vertica
 
     def get_singular_events
       sql = "select " \
-        "0 AS d, 0 AS h, max(epoch) " \
+        "NULL AS d, NULL AS h, max(epoch) " \
         "from #{q_schema}.#{q_table} " \
+        "#{q_conditions.empty? ? '' : "where #{q_conditions} "}" \
         "having max(epoch) > #{q_singular_last_epoch}"
       query_and_get_events(:singular, sql)
     end
@@ -89,6 +91,7 @@ module Triglav::Agent::Vertica
         "#{q_date} AS d, DATE_PART('hour', #{q_timestamp}) AS h, max(epoch) " \
         "from #{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
+        "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
         "group by d, h having max(epoch) > #{q_periodic_last_epoch} " \
         "order by d, h"
       query_and_get_events(:hourly, sql)
@@ -99,6 +102,7 @@ module Triglav::Agent::Vertica
         "#{q_date} AS d, 0 AS h, max(epoch) " \
         "from #{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
+        "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
         "group by d having max(epoch) > #{q_periodic_last_epoch} " \
         "order by d"
       query_and_get_events(:daily, sql)
@@ -189,7 +193,7 @@ module Triglav::Agent::Vertica
           resource_unit: unit.to_s,
           resource_time: date_hour_to_i(date, hour, resource.timezone),
           resource_timezone: resource.timezone,
-          payload: {d: date, h: hour, epoch: epoch}.to_json,
+          payload: (date ? {d: date.to_s, h: hour.to_i} : {}).merge!(epoch: epoch).to_json,
         }
       end
     end
@@ -206,13 +210,13 @@ module Triglav::Agent::Vertica
           resource_unit: 'daily',
           resource_time: date_hour_to_i(date, 0, resource.timezone),
           resource_timezone: resource.timezone,
-          payload: {epoch: epoch},
+          payload: {d: date.to_s, h: 0, epoch: epoch}.to_json,
         }
       end
     end
 
     def date_hour_to_i(date, hour, timezone)
-      return 0 if date.nil? or date == 0
+      return 0 if date.nil?
       Time.strptime("#{date.to_s} #{hour.to_i} #{timezone}", '%Y-%m-%d %H %z').to_i
     end
 
@@ -232,12 +236,39 @@ module Triglav::Agent::Vertica
       @table ||= URI.parse(resource.uri).path[1..-1].split('/')[2]
     end
 
+    def conditions
+      return @conditions if @conditions
+      query = URI.parse(resource.uri).query
+      @conditions = query ? URI::decode_www_form(query) : []
+    end
+
     def q_schema
       @q_schema ||= Vertica.quote_identifier(schema)
     end
     
     def q_table
       @q_table ||= Vertica.quote_identifier(table)
+    end
+
+    # Value specification:
+    # * A value looks like an integer string is treated as an integer.
+    # * If you want to treat it as as string, surround with double quote or single quote.
+    # * A value does not look like an integer is treated as a string.
+    # Operator specification:
+    # * Only equality is supported now
+    def q_conditions
+      @q_conditions ||= conditions.map do |col, val|
+        begin
+          val = Integer(val)
+        rescue => e
+          if val.start_with?("'") and val.end_with?("'")
+            val = val[1..-2]
+          elsif val.start_with?('"') and val.end_with?('"')
+            val = val[1..-2]
+          end
+        end
+        "#{Vertica.quote_identifier(col)} = #{Vertica.quote(val)}"
+      end.join(' AND ')
     end
 
     def q_date

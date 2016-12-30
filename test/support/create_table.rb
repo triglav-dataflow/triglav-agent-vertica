@@ -15,23 +15,32 @@ module CreateTable
     now = Time.now
     50.times.map do |i|
       t = now - i * 3600
-      { logtime: t.to_i, d: t.strftime("%Y-%m-%d"), t: t.strftime("%Y-%m-%d %H:%M:%S") }
+      {
+        d: t.strftime("%Y-%m-%d"),
+        t: t.strftime("%Y-%m-%d %H:%M:%S"),
+        id: i,
+        uuid: i.to_s,
+      }
     end
   end
 
   def create_table
     connection.query(<<~SQL)
       CREATE TABLE IF NOT EXISTS #{schema}.#{table} (
-        logtime integer,
         d date,
-        t timestamp
+        t timestamp,
+        id integer,
+        uuid varchar(12)
       );
     SQL
   end
 
   def insert_data
     data.each do |row|
-      connection.query(%Q[INSERT INTO #{schema}.#{table} VALUES (#{row[:logtime]}, '#{row[:d]}', '#{row[:t]}')])
+      connection.query(%Q[
+        INSERT INTO #{schema}.#{table} VALUES
+        ('#{row[:d]}', '#{row[:t]}', #{row[:id]}, '#{row[:uuid]}')
+      ])
     end
     connection.query('commit')
   end

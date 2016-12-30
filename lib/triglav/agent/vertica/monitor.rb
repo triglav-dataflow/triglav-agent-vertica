@@ -31,7 +31,7 @@ module Triglav::Agent::Vertica
       events, new_last_epoch = get_events
       $logger.debug { "Finish process #{resource.uri}, last_epoch:#{last_epoch}, new_last_epoch:#{new_last_epoch}" }
       return if events.nil? || events.empty?
-      yield(events) # send_message
+      yield(events) if block_given? # send_message
       update_status_file(new_last_epoch)
     end
 

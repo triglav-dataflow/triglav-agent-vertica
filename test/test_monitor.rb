@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'helper'
+require_relative 'support/create_table'
 require 'triglav/agent/vertica/monitor'
 
 # This test requires a real connection to vertica, now
@@ -12,25 +13,34 @@ require 'triglav/agent/vertica/monitor'
 # VERTICA_HOST=vertica
 # VERTICA_PORT=5433
 # VERTICA_DATABASE=vdb
-# VERTICA_USER=dbread
+# VERTICA_USER=dbwrite
 # VERTICA_PASSWORD=xxxxxxx
 if File.exist?(File.join(ROOT, '.env'))
   class TestMonitor < Test::Unit::TestCase
+    include CreateTable
+
+    class << self
+      def startup
+        Timecop.travel(Time.parse("2016-12-30 23:00:00 +09:00"))
+        create_table
+        insert_data
+      end
+
+      def shutdown
+        drop_table
+        Timecop.return
+      end
+    end
+
     def build_resource(params = {})
       TriglavClient::ResourceResponse.new({
-        uri: 'vertica://localhost/vdb/mobage_jp_12019106/raw_log_010101',
+        uri: "vertica://localhost/vdb/#{schema}/#{table}",
         unit: 'daily',
         timezone: '+09:00',
         span_in_days: 2,
         consumable: true,
         notifiable: false,
       }.merge(params))
-    end
-
-    def connection
-      return @connection if @connection
-      connection_info = $setting.dig(:vertica, :connection_info)[:'vertica://']
-      @connection ||= Triglav::Agent::Vertica::Connection.new(connection_info)
     end
 
     def test_process
@@ -44,7 +54,7 @@ if File.exist?(File.join(ROOT, '.env'))
       monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
       events, new_last_epoch = monitor.get_events
       assert { events != nil}
-      assert { events.size > resource.span_in_days * 24 }
+      assert { events.size >= resource.span_in_days * 24 }
       event = events.first
       assert { event.keys == %i[resource_uri resource_unit resource_time resource_timezone payload] }
       assert { event[:resource_uri] == resource.uri }

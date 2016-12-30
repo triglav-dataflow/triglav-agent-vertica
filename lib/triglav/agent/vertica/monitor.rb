@@ -152,6 +152,7 @@ module Triglav::Agent::Vertica
       resource.unit.split(',').each do |item|
         return false unless %w[singular daily hourly].include?(item)
       end
+      true
     end
 
     def hourly?

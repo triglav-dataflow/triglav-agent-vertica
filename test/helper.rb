@@ -12,7 +12,7 @@ ROOT = File.dirname(__dir__)
 ENV['APP_ENV'] = 'test'
 
 opts = {
-  config: File.join(TEST_ROOT, 'config.yml'),
+  config: File.join(TEST_ROOT, 'support', 'config.yml'),
   status: File.join(TEST_ROOT, 'tmp', 'status.yml'),
   token: File.join(TEST_ROOT, 'tmp', 'token.yml'),
   dotenv: true,

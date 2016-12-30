@@ -10,6 +10,7 @@ Triglav Agent for Vertica
 
 * Vertica table must have a DATE column for `daily` resource monitor
 * Vertica table must have a TIMESTAMP or TIMESTAMPTZ column for `hourly` resource monitor
+* Vertica view is not supported (since `epoch` column can not be retrieved)
 
 ## Installation
 

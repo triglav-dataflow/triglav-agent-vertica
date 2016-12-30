@@ -14,6 +14,8 @@ module Triglav::Agent::Vertica
     #   timezone: '+09:00'
     #   span_in_days: 32
     # @param [Integer] last_epoch (for debug)
+    #
+    # View is not supported
     def initialize(connection, resource, last_epoch: nil)
       @connection = connection
       @resource = resource

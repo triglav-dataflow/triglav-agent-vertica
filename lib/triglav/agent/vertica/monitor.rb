@@ -4,7 +4,7 @@ require 'uri'
 
 module Triglav::Agent::Vertica
   class Monitor
-    attr_reader :connection, :resource, :last_epoch
+    attr_reader :connection, :resource, :periodic_last_epoch, :singular_last_epoch
 
     # @param [Triglav::Agent::Vertica::Connection] connection
     # @param [TriglavClient::ResourceResponse] resource
@@ -17,62 +17,99 @@ module Triglav::Agent::Vertica
     def initialize(connection, resource, last_epoch: nil)
       @connection = connection
       @resource = resource
-      @last_epoch = last_epoch || get_last_epoch
+      @periodic_last_epoch = last_epoch || get_last_epoch(:periodic)
+      @singular_last_epoch = last_epoch || get_last_epoch(:singular)
     end
 
     def process
-      if !%w[daily hourly daily,hourly].include?(resource.unit) ||
-          resource.timezone.nil? || resource.span_in_days.nil?
+      unless resource_valid?
         $logger.warn { "Broken resource: #{resource.to_s}" }
         return nil
       end
 
-      $logger.debug { "Start process #{resource.uri}, last_epoch:#{last_epoch}" }
-      events, new_last_epoch = get_events
-      $logger.debug { "Finish process #{resource.uri}, last_epoch:#{last_epoch}, new_last_epoch:#{new_last_epoch}" }
-      return if events.nil? || events.empty?
+      $logger.debug {
+        msgs = ["Start process #{resource.uri}"]
+        msgs << "periodic_last_epoch:#{periodic_last_epoch}" if periodic_last_epoch
+        msgs << "singular_last_epoch:#{singular_last_epoch}" if singular_last_epoch
+        msgs.join(', ')
+      }
+
+      if periodic?
+        periodic_events, new_periodic_last_epoch = get_periodic_events
+        events = periodic_events || []
+      end
+      if singular?
+        singular_events, new_singular_last_epoch = get_singular_events
+        events.nil? ? (events = singular_events) : events.concat(singular_events || [])
+      end
+
+      $logger.debug {
+        msgs = ["Finish process #{resource.uri}"]
+        msgs << "periodic_last_epoch:#{periodic_last_epoch}" if periodic_last_epoch
+        msgs << "singular_last_epoch:#{singular_last_epoch}" if singular_last_epoch
+        msgs << "new_periodic_last_epoch:#{new_periodic_last_epoch}" if new_periodic_last_epoch
+        msgs << "new_singular_last_epoch:#{new_singular_last_epoch}" if new_singular_last_epoch
+        msgs.join(', ')
+      }
+
+      return nil if events.nil? || events.empty?
       yield(events) if block_given? # send_message
-      update_status_file(new_last_epoch)
+      update_status_file(:periodic, new_periodic_last_epoch) if new_periodic_last_epoch
+      update_status_file(:singular, new_singular_last_epoch) if new_singular_last_epoch
+      true
     end
 
-    def get_events
-      q_last_epoch = Vertica.quote(last_epoch)
-
-      _, schema, table = URI.parse(resource.uri).path[1..-1].split('/')
-      q_schema = Vertica.quote_identifier(schema)
-      q_table  = Vertica.quote_identifier(table)
-
-      q_date = Vertica.quote_identifier(date_column)
-      q_timestamp = Vertica.quote_identifier(timestamp_column)
-
-      case query_unit
-      when 'hourly'
-        sql = "select " \
-          "#{q_date} AS d, DATE_PART('hour', #{q_timestamp}) AS h, max(epoch) " \
-          "from #{q_schema}.#{q_table} " \
-          "where #{q_date} IN ('#{dates.join("','")}') " \
-          "group by d, h having max(epoch) > #{q_last_epoch} " \
-          "order by d, h"
-      when 'daily'
-        sql = "select " \
-          "#{q_date} AS d, 0 AS h, max(epoch) " \
-          "from #{q_schema}.#{q_table} " \
-          "where #{q_date} IN ('#{dates.join("','")}') " \
-          "group by d having max(epoch) > #{q_last_epoch} " \
-          "order by d"
+    def get_periodic_events
+      if hourly?
+        events, new_last_epoch, rows = get_hourly_events
+        if daily?
+          daily_events = build_daily_events_from_hourly(rows)
+          events.concat(daily_events)
+        end
+        [events, new_last_epoch]
+      elsif daily?
+        get_daily_events
+      else
+        raise
       end
+    end
 
+    def get_singular_events
+      sql = "select " \
+        "0 AS d, 0 AS h, max(epoch) " \
+        "from #{q_schema}.#{q_table} " \
+        "having max(epoch) > #{q_singular_last_epoch}"
+      query_and_get_events(:singular, sql)
+    end
+
+    def get_hourly_events
+      sql = "select " \
+        "#{q_date} AS d, DATE_PART('hour', #{q_timestamp}) AS h, max(epoch) " \
+        "from #{q_schema}.#{q_table} " \
+        "where #{q_date} IN ('#{dates.join("','")}') " \
+        "group by d, h having max(epoch) > #{q_periodic_last_epoch} " \
+        "order by d, h"
+      query_and_get_events(:hourly, sql)
+    end
+
+    def get_daily_events
+      sql = "select " \
+        "#{q_date} AS d, 0 AS h, max(epoch) " \
+        "from #{q_schema}.#{q_table} " \
+        "where #{q_date} IN ('#{dates.join("','")}') " \
+        "group by d having max(epoch) > #{q_periodic_last_epoch} " \
+        "order by d"
+      query_and_get_events(:daily, sql)
+    end
+
+    private
+
+    def query_and_get_events(unit, sql)
       $logger.debug { "Query: #{sql}" }
       rows = connection.query(sql)
-
-      events = build_events(rows)
-      if resource.unit == 'daily,hourly'
-        daily_events = build_daily_events_from_hourly(rows)
-        events.concat(daily_events)
-      end
-
-      new_last_epoch = latest_epoch(rows)
-      [events, new_last_epoch]
+      events = build_events(unit, rows)
+      new_last_epoch = build_latest_epoch(rows)
+      [events, new_last_epoch, rows]
     rescue Vertica::Error::QueryError => e
       $logger.warn { "#{e.class} #{e.message}" } # e.message includes sql
       nil
@@ -81,20 +118,18 @@ module Triglav::Agent::Vertica
       nil
     end
 
-    private
-
-    def update_status_file(last_epoch)
+    def update_status_file(key, last_epoch)
       Triglav::Agent::StorageFile.set(
         $setting.status_file,
-        [:last_epoch, resource.uri.to_sym],
+        [:last_epoch, resource.uri.to_sym, key.to_sym],
         last_epoch
       )
     end
 
-    def get_last_epoch
+    def get_last_epoch(key)
       Triglav::Agent::StorageFile.getsetnx(
         $setting.status_file,
-        [:last_epoch, resource.uri.to_sym],
+        [:last_epoch, resource.uri.to_sym, key.to_sym],
         get_current_epoch
       )
     end
@@ -103,9 +138,33 @@ module Triglav::Agent::Vertica
       connection.query('select GET_CURRENT_EPOCH()').first.first
     end
 
-    # 'daily,hourly': qeury in hourly way, then merge events into daily in ruby
-    def query_unit
-      @query_unit ||= resource.unit == 'daily,hourly' ? 'hourly' : resource.unit
+    def resource_valid?
+      resource_unit_valid? && !resource.timezone.nil? && !resource.span_in_days.nil?
+    end
+
+    def resource_unit_valid?
+      resource.unit.split(',').each do |item|
+        return false unless %w[singular daily hourly].include?(item)
+      end
+    end
+
+    def hourly?
+      return @is_hourly unless @is_hourly.nil?
+      @is_hourly = resource.unit.include?('hourly')
+    end
+
+    def daily?
+      return @is_daily unless @is_daily.nil?
+      @is_daily = resource.unit.include?('daily')
+    end
+
+    def singular?
+      return @is_singular unless @is_singular.nil?
+      @is_singular = resource.unit.include?('singular')
+    end
+
+    def periodic?
+      hourly? or daily?
     end
 
     def dates
@@ -116,16 +175,16 @@ module Triglav::Agent::Vertica
       end
     end
 
-    def latest_epoch(rows)
-      rows.map {|row| row[2] }.max || last_epoch
+    def build_latest_epoch(rows)
+      rows.map {|row| row[2] }.max
     end
 
-    def build_events(rows)
+    def build_events(unit, rows)
       rows.map do |row|
         date, hour, epoch = row[0], row[1], row[2]
         {
           resource_uri: resource.uri,
-          resource_unit: query_unit,
+          resource_unit: unit.to_s,
           resource_time: date_hour_to_i(date, hour, resource.timezone),
           resource_timezone: resource.timezone,
           payload: {d: date, h: hour, epoch: epoch}.to_json,
@@ -151,7 +210,40 @@ module Triglav::Agent::Vertica
     end
 
     def date_hour_to_i(date, hour, timezone)
+      return 0 if date.nil? or date == 0
       Time.strptime("#{date.to_s} #{hour.to_i} #{timezone}", '%Y-%m-%d %H %z').to_i
+    end
+
+    def q_periodic_last_epoch
+      @q_periodic_last_epoch ||= Vertica.quote(periodic_last_epoch)
+    end
+
+    def q_singular_last_epoch
+      @q_singular_last_epoch ||= Vertica.quote(singular_last_epoch)
+    end
+
+    def schema
+      @schema ||= URI.parse(resource.uri).path[1..-1].split('/')[1]
+    end
+
+    def table
+      @table ||= URI.parse(resource.uri).path[1..-1].split('/')[2]
+    end
+
+    def q_schema
+      @q_schema ||= Vertica.quote_identifier(schema)
+    end
+    
+    def q_table
+      @q_table ||= Vertica.quote_identifier(table)
+    end
+
+    def q_date
+      @q_date ||= Vertica.quote_identifier(date_column)
+    end
+
+    def q_timestamp
+      @q_timestamp ||= Vertica.quote_identifier(timestamp_column)
     end
 
     def date_column

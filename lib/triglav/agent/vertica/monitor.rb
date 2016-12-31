@@ -20,8 +20,8 @@ module Triglav::Agent::Vertica
     def initialize(connection, resource, last_epoch: nil)
       @connection = connection
       @resource = resource
-      @periodic_last_epoch = last_epoch || get_last_epoch(:periodic)
-      @singular_last_epoch = last_epoch || get_last_epoch(:singular)
+      @periodic_last_epoch = last_epoch || get_from_status_file(:periodic_last_epoch)
+      @singular_last_epoch = last_epoch || get_from_status_file(:singular_last_epoch)
     end
 
     def process
@@ -57,8 +57,8 @@ module Triglav::Agent::Vertica
 
       return nil if events.nil? || events.empty?
       yield(events) if block_given? # send_message
-      update_status_file(:periodic, new_periodic_last_epoch) if new_periodic_last_epoch
-      update_status_file(:singular, new_singular_last_epoch) if new_singular_last_epoch
+      update_status_file(:periodic_last_epoch, new_periodic_last_epoch) if new_periodic_last_epoch
+      update_status_file(:singular_last_epoch, new_singular_last_epoch) if new_singular_last_epoch
       true
     end
 
@@ -127,15 +127,15 @@ module Triglav::Agent::Vertica
     def update_status_file(key, last_epoch)
       Triglav::Agent::StorageFile.set(
         $setting.status_file,
-        [:last_epoch, resource.uri.to_sym, key.to_sym],
+        [:v1, resource.uri.to_sym, key.to_sym],
         last_epoch
       )
     end
 
-    def get_last_epoch(key)
+    def get_from_status_file(key)
       Triglav::Agent::StorageFile.getsetnx(
         $setting.status_file,
-        [:last_epoch, resource.uri.to_sym, key.to_sym],
+        [:v1, resource.uri.to_sym, key.to_sym],
         get_current_epoch
       )
     end

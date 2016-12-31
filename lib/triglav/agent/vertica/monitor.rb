@@ -11,7 +11,7 @@ module Triglav::Agent::Vertica
     # @param [TriglavClient::ResourceResponse] resource
     # resource:
     #   uri: vertica://host/database/schema/table
-    #   unit: 'daily' or 'hourly', or 'daily,hourly'
+    #   unit: 'daily', 'hourly', 'singular', or their combinations such as 'singular,daily,hourly'
     #   timezone: '+09:00'
     #   span_in_days: 32
     # @param [Integer] last_epoch (for debug)

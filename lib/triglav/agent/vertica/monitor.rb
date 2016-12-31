@@ -80,7 +80,7 @@ module Triglav::Agent::Vertica
     def get_singular_events
       sql = "select " \
         "NULL AS d, NULL AS h, max(epoch) " \
-        "from #{q_schema}.#{q_table} " \
+        "from #{q_db}.#{q_schema}.#{q_table} " \
         "#{q_conditions.empty? ? '' : "where #{q_conditions} "}" \
         "having max(epoch) > #{q_singular_last_epoch}"
       query_and_get_events(:singular, sql)
@@ -89,7 +89,7 @@ module Triglav::Agent::Vertica
     def get_hourly_events
       sql = "select " \
         "#{q_date} AS d, DATE_PART('hour', #{q_timestamp}) AS h, max(epoch) " \
-        "from #{q_schema}.#{q_table} " \
+        "from #{q_db}.#{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
         "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
         "group by d, h having max(epoch) > #{q_periodic_last_epoch} " \
@@ -100,7 +100,7 @@ module Triglav::Agent::Vertica
     def get_daily_events
       sql = "select " \
         "#{q_date} AS d, 0 AS h, max(epoch) " \
-        "from #{q_schema}.#{q_table} " \
+        "from #{q_db}.#{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
         "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
         "group by d having max(epoch) > #{q_periodic_last_epoch} " \
@@ -229,6 +229,10 @@ module Triglav::Agent::Vertica
       @q_singular_last_epoch ||= Vertica.quote(singular_last_epoch)
     end
 
+    def db
+      @db ||= URI.parse(resource.uri).path[1..-1].split('/')[0]
+    end
+
     def schema
       @schema ||= URI.parse(resource.uri).path[1..-1].split('/')[1]
     end
@@ -241,6 +245,10 @@ module Triglav::Agent::Vertica
       return @conditions if @conditions
       query = URI.parse(resource.uri).query
       @conditions = query ? URI::decode_www_form(query) : []
+    end
+
+    def q_db
+      @q_db ||= Vertica.quote_identifier(db)
     end
 
     def q_schema

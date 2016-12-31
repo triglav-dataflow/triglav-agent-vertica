@@ -3,6 +3,18 @@ module CreateTable
     klass.extend(self)
   end
 
+  def host
+    connection_info[:host]
+  end
+
+  def port
+    connection_info[:port]
+  end
+
+  def db
+    'vdb'
+  end
+
   def schema
     'sandbox'
   end
@@ -26,7 +38,7 @@ module CreateTable
 
   def create_table
     connection.query(<<~SQL)
-      CREATE TABLE IF NOT EXISTS #{schema}.#{table} (
+      CREATE TABLE IF NOT EXISTS #{db}.#{schema}.#{table} (
         d date,
         t timestamp,
         id integer,
@@ -38,7 +50,7 @@ module CreateTable
   def insert_data
     data.each do |row|
       connection.query(%Q[
-        INSERT INTO #{schema}.#{table} VALUES
+        INSERT INTO #{db}.#{schema}.#{table} VALUES
         ('#{row[:d]}', '#{row[:t]}', #{row[:id]}, '#{row[:uuid]}')
       ])
     end
@@ -46,12 +58,15 @@ module CreateTable
   end
 
   def drop_table
-    connection.query("DROP TABLE IF EXISTS #{schema}.#{table}")
+    connection.query("DROP TABLE IF EXISTS #{db}.#{schema}.#{table}")
   end
 
   def connection
     return @connection if @connection
-    connection_info = $setting.dig(:vertica, :connection_info)[:'vertica://']
     @connection ||= Triglav::Agent::Vertica::Connection.new(connection_info)
+  end
+
+  def connection_info
+    @connection_info ||= $setting.dig(:vertica, :connection_info)[:'vertica://']
   end
 end

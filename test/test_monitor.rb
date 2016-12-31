@@ -33,7 +33,7 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def build_resource(params = {})
       TriglavClient::ResourceResponse.new({
-        uri: "vertica://localhost/vdb/#{schema}/#{table}",
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}",
         unit: 'daily',
         timezone: '+09:00',
         span_in_days: 2,
@@ -126,7 +126,7 @@ if File.exist?(File.join(ROOT, '.env'))
     # * Only equality is supported now
     def test_query_conditions
       resource = build_resource(
-        uri: "vertica://localhost/vdb/#{schema}/#{table}?id=0&uuid='0'&d=2016-12-30"
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?id=0&uuid='0'&d=2016-12-30"
       )
       monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
       q_conditions = monitor.send(:q_conditions)
@@ -136,7 +136,7 @@ if File.exist?(File.join(ROOT, '.env'))
     def test_get_events_with_query_conditions
       resource = build_resource(
         unit: 'singular,daily,hourly',
-        uri: "vertica://localhost/vdb/#{schema}/#{table}?id=0&uuid='0'"
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?id=0&uuid='0'"
       )
       monitor = Triglav::Agent::Vertica::Monitor.new(connection, resource, last_epoch: 0)
       success = monitor.process do |events|

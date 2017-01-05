@@ -24,28 +24,39 @@ module Triglav::Agent
         end
       rescue => e
         # ServerEngine.dump_uncaught_error does not tell me e.class
-        $logger.error { "#{e.class} #{e.message} #{e.backtrace.join("\\n")}" } # one line
+        log_error(e)
         raise e
       end
+
+      MAX_CONSECUTIVE_ERROR_COUNT = 3
 
       def process
         started = Time.now
         $logger.info { "Start Worker#process worker_id:#{worker_id}" }
         api_client = ApiClient.new # renew connection
 
-        # It is possible to seperate agent process by prefixes of resource uris
         count = 0
-        resource_uri_prefixes.each do |resource_uri_prefix|
-          break if stopped?
-          # list_aggregated_resources returns unique resources which we have to monitor
-          next unless resources = api_client.list_aggregated_resources(resource_uri_prefix)
-          $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} resources.size:#{resources.size}" }
-          connection = Connection.new(get_connection_info(resource_uri_prefix))
-          resources.each do |resource|
+        consecutive_error_count = 0
+        catch(:break) do
+          # It is possible to seperate agent process by prefixes of resource uris
+          resource_uri_prefixes.each do |resource_uri_prefix|
             break if stopped?
-            count += 1
-            monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
-            monitor.process {|events| api_client.send_messages(events) }
+            # list_aggregated_resources returns unique resources which we have to monitor
+            next unless resources = api_client.list_aggregated_resources(resource_uri_prefix)
+            $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} resources.size:#{resources.size}" }
+            connection = Connection.new(get_connection_info(resource_uri_prefix))
+            resources.each do |resource|
+              throw(:break) if stopped?
+              count += 1
+              monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
+              begin
+                monitor.process {|events| api_client.send_messages(events) }
+                consecutive_error_count = 0
+              rescue => e
+                log_error(e)
+                throw(:break) if (consecutive_error_count += 1) >= MAX_CONSECUTIVE_ERROR_COUNT
+              end
+            end
           end
         end
         elapsed = Time.now - started
@@ -69,6 +80,10 @@ module Triglav::Agent
       end
 
       private
+
+      def log_error(e)
+        $logger.error { "#{e.class} #{e.message} #{e.backtrace.join("\\n")}" } # one line
+      end
 
       def monitor_interval
         $setting.dig(:vertica, :monitor_interval) || 60

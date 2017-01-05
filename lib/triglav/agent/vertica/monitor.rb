@@ -218,7 +218,7 @@ module Triglav::Agent::Vertica
 
     def date_hour_to_i(date, hour, timezone)
       return 0 if date.nil?
-      Time.strptime("#{date.to_s} #{hour.to_i} #{timezone}", '%Y-%m-%d %H %z').to_i
+      Time.strptime("#{date.strftime("%Y-%m-%d")} #{hour.to_i} #{timezone}", '%Y-%m-%d %H %z').to_i
     end
 
     def q_periodic_last_epoch

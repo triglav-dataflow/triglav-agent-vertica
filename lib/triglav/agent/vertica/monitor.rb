@@ -127,7 +127,7 @@ module Triglav::Agent::Vertica
     def update_status_file(key, last_epoch)
       Triglav::Agent::StorageFile.set(
         $setting.status_file,
-        [:v1, resource.uri.to_sym, key.to_sym],
+        [resource.uri.to_sym, key.to_sym],
         last_epoch
       )
     end
@@ -135,7 +135,7 @@ module Triglav::Agent::Vertica
     def get_from_status_file(key)
       Triglav::Agent::StorageFile.getsetnx(
         $setting.status_file,
-        [:v1, resource.uri.to_sym, key.to_sym],
+        [resource.uri.to_sym, key.to_sym],
         get_current_epoch
       )
     end

@@ -2,6 +2,7 @@ require 'triglav/agent/vertica/connection'
 require 'vertica'
 require 'uri'
 require 'cgi'
+require 'securerandom'
 
 module Triglav::Agent::Vertica
   class Monitor
@@ -190,6 +191,7 @@ module Triglav::Agent::Vertica
       rows.map do |row|
         date, hour, epoch = row[0], row[1], row[2]
         {
+          uuid: SecureRandom.uuid,
           resource_uri: resource.uri,
           resource_unit: unit.to_s,
           resource_time: date_hour_to_i(date, hour, resource.timezone),
@@ -207,6 +209,7 @@ module Triglav::Agent::Vertica
       end
       daily_events = max_epoch_of.map do |date, epoch|
         {
+          uuid: SecureRandom.uuid,
           resource_uri: resource.uri,
           resource_unit: 'daily',
           resource_time: date_hour_to_i(date, 0, resource.timezone),

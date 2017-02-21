@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
 gemspec
-gem 'triglav_client', git: 'git@github.com:sonots/triglav-client-ruby'
-gem 'triglav-agent', git: 'git@github.com:sonots/triglav-agent-framework-ruby'
+gem 'triglav_client', git: 'https://github.com/triglav-dataflow/triglav-client-ruby'
+gem 'triglav-agent', git: 'https://github.com/triglav-dataflow/triglav-agent-framework-ruby'
 gem 'pry-nav'

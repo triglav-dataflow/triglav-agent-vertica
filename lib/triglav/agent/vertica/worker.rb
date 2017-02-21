@@ -39,6 +39,7 @@ module Triglav::Agent
           total_count += processor.total_count
           total_success_count += processor.process
         end
+
         elapsed = Time.now - started
         $logger.info {
           "Finish Worker#process worker_id:#{worker_id} " \

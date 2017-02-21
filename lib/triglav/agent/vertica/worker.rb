@@ -1,5 +1,4 @@
-require 'triglav/agent/vertica/monitor'
-require 'triglav/agent/vertica/connection'
+require 'triglav/agent/vertica/processor'
 
 module Triglav::Agent
   module Vertica
@@ -28,39 +27,23 @@ module Triglav::Agent
         raise e
       end
 
-      MAX_CONSECUTIVE_ERROR_COUNT = 3
-
       def process
         started = Time.now
         $logger.info { "Start Worker#process worker_id:#{worker_id}" }
-        api_client = ApiClient.new # renew connection
 
-        count = 0
-        consecutive_error_count = 0
-        catch(:break) do
-          # It is possible to seperate agent process by prefixes of resource uris
-          resource_uri_prefixes.each do |resource_uri_prefix|
-            break if stopped?
-            # list_aggregated_resources returns unique resources which we have to monitor
-            next unless resources = api_client.list_aggregated_resources(resource_uri_prefix)
-            $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} resources.size:#{resources.size}" }
-            connection = Connection.new(get_connection_info(resource_uri_prefix))
-            resources.each do |resource|
-              throw(:break) if stopped?
-              count += 1
-              monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
-              begin
-                monitor.process {|events| api_client.send_messages(events) }
-                consecutive_error_count = 0
-              rescue => e
-                log_error(e)
-                throw(:break) if (consecutive_error_count += 1) >= MAX_CONSECUTIVE_ERROR_COUNT
-              end
-            end
-          end
+        total_count = 0
+        total_success_count = 0
+        resource_uri_prefixes.each do |resource_uri_prefix|
+          break if stopped?
+          processor = Processor.new(self, resource_uri_prefix)
+          total_count += processor.total_count
+          total_success_count += processor.process
         end
         elapsed = Time.now - started
-        $logger.info { "Finish Worker#process worker_id:#{worker_id} count:#{count} elapsed:#{elapsed.to_f}sec" }
+        $logger.info {
+          "Finish Worker#process worker_id:#{worker_id} " \
+          "success_count/total_count:#{total_success_count}/#{total_count} elapsed:#{elapsed.to_f}sec"
+        }
       end
 
       def start
@@ -91,10 +74,6 @@ module Triglav::Agent
 
       def resource_uri_prefixes
         $setting.dig(:vertica, :connection_info).keys
-      end
-
-      def get_connection_info(resource_uri_prefix)
-        $setting.dig(:vertica, :connection_info)[resource_uri_prefix]
       end
     end
   end

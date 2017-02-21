@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
-require_relative 'helper'
 require 'triglav/agent/vertica/monitor'
+require_relative 'helper'
+require_relative 'support/create_table'
 
 # This test requires a real connection to vertica, now
 # Configure .env to set proper connection_info of test/config.yml

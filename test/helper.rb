@@ -5,7 +5,6 @@ require 'test/unit/rr'
 require 'pry'
 require 'timecop'
 require 'triglav/agent/vertica'
-require_relative 'support/create_table'
 
 TEST_ROOT = __dir__
 ROOT = File.dirname(__dir__)

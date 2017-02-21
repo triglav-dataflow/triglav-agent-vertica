@@ -98,7 +98,7 @@ Start up triglav api on localhost.
 Run triglav-anget-vertica as:
 
 ```
-TRIGLAV_ENV=development bundle exec triglav-agent-vertica --dotenv --debug
+TRIGLAV_ENV=development bundle exec triglav-agent-vertica --dotenv --debug -c example/config.yml
 ```
 
 The debug mode with --debug option ignores the `last_epoch` value in status file.

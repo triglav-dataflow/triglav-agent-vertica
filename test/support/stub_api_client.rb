@@ -4,10 +4,10 @@ module StubApiClient
   end
 
   def stub_api_client
-    stub.proxy(Triglav::Agent::ApiClient).new do |obj|
-      stub(obj).list_aggregated_resources { [dummy_resource] }
-      stub(obj).send_messages { }
-    end
+    obj = Object.new
+    stub(Triglav::Agent::ApiClient).new { obj }
+    stub(obj).list_aggregated_resources { [dummy_resource] }
+    stub(obj).send_messages { }
   end
 
   def dummy_resource

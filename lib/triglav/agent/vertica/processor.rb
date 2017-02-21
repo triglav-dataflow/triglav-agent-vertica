@@ -24,12 +24,16 @@ module Triglav::Agent
           events = nil
           begin
             monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
-            monitor.process {|_events| events = _events; api_client.send_messages(events) }
+            monitor.process do |_events|
+              events = _events
+              $logger.info { "send_messages:#{events.map(&:to_hash).to_json}" }
+              api_client.send_messages(events)
+            end
             success_count += 1
             consecutive_error_count = 0
           rescue => e
             log_error(e)
-            $logger.info { "failed_events:#{events.to_json}" } if events
+            $logger.info { "failed_events:#{events.map(&:to_hash).to_json}" } if events
             raise TooManyError if (consecutive_error_count += 1) > self.class.max_consecuitive_error_count
           end
         end

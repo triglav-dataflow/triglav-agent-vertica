@@ -70,6 +70,30 @@ This section is the special section for triglav-agent-vertica.
 * **monitor_interval**: The interval to watch tables (number, default: 60)
 * **connection_info**: key-value pairs of vertica connection info where keys are resource URI pattern in regular expression, and values are connection infomation
 
+### Specification of Resource URI
+
+Resource URI must be a form of:
+
+```
+vertica://#{host}:#{port}/#{db}/#{schema}/#{table}
+```
+
+URI also accepts query parameters of `date`, `timestamp`, and `where`.
+
+* **date** (string): date column name (default: `d`)
+* **timestamp** (string): timestamp column name (defualt: `t`)
+* **where** (hash): where conditions (default: nil)
+ * A value looks like an integer string is treated as an integer such as `1`
+ * If you want to treat it as as string, surround with double quote or single quote such as `'0'`
+ * A value does not look like an integer is treated as a string such as `foo`
+ * Only equality operator is supported now
+
+ex)
+
+```
+?date=d&timestamp=t&where[id]=0&where[d]=2016-12-30
+```
+
 ## How it behaves
 
 1. Authenticate with triglav

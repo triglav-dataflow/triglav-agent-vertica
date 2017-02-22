@@ -3,6 +3,7 @@ require 'vertica'
 require 'uri'
 require 'cgi'
 require 'securerandom'
+require 'rack/utils'
 
 module Triglav::Agent::Vertica
   class Monitor
@@ -82,7 +83,7 @@ module Triglav::Agent::Vertica
       sql = "select " \
         "NULL AS d, NULL AS h, max(epoch) " \
         "from #{q_db}.#{q_schema}.#{q_table} " \
-        "#{q_conditions.empty? ? '' : "where #{q_conditions} "}" \
+        "#{q_where.empty? ? '' : "where #{q_where} "}" \
         "having max(epoch) > #{q_singular_last_epoch}"
       query_and_get_events(:singular, sql)
     end
@@ -92,7 +93,7 @@ module Triglav::Agent::Vertica
         "#{q_date} AS d, DATE_PART('hour', #{q_timestamp}) AS h, max(epoch) " \
         "from #{q_db}.#{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
-        "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
+        "#{q_where.empty? ? '' : "AND #{q_where} "}" \
         "group by d, h having max(epoch) > #{q_periodic_last_epoch} " \
         "order by d, h"
       query_and_get_events(:hourly, sql)
@@ -103,7 +104,7 @@ module Triglav::Agent::Vertica
         "#{q_date} AS d, 0 AS h, max(epoch) " \
         "from #{q_db}.#{q_schema}.#{q_table} " \
         "where #{q_date} IN ('#{dates.join("','")}') " \
-        "#{q_conditions.empty? ? '' : "AND #{q_conditions} "}" \
+        "#{q_where.empty? ? '' : "AND #{q_where} "}" \
         "group by d having max(epoch) > #{q_periodic_last_epoch} " \
         "order by d"
       query_and_get_events(:daily, sql)
@@ -232,22 +233,36 @@ module Triglav::Agent::Vertica
       @q_singular_last_epoch ||= Vertica.quote(singular_last_epoch)
     end
 
+    def parsed_uri
+      @parsed_uri ||= URI.parse(resource.uri)
+    end
+
+    def parsed_query
+      @parsed_query ||= Rack::Utils.parse_nested_query(parsed_uri.query)
+    end
+
     def db
-      @db ||= URI.parse(resource.uri).path[1..-1].split('/')[0]
+      @db ||= parsed_uri.path[1..-1].split('/')[0]
     end
 
     def schema
-      @schema ||= URI.parse(resource.uri).path[1..-1].split('/')[1]
+      @schema ||= parsed_uri.path[1..-1].split('/')[1]
     end
 
     def table
-      @table ||= URI.parse(resource.uri).path[1..-1].split('/')[2]
+      @table ||= parsed_uri.path[1..-1].split('/')[2]
     end
 
-    def conditions
-      return @conditions if @conditions
-      query = URI.parse(resource.uri).query
-      @conditions = query ? URI::decode_www_form(query) : []
+    def date_column
+      parsed_query['date'] || $setting.dig(:vertica, :date_column) || 'd'
+    end
+
+    def timestamp_column
+      parsed_query['timestamp'] || $setting.dig(:vertica, :timestamp_column) || 't'
+    end
+
+    def where
+      parsed_query['where'] || {}
     end
 
     def q_db
@@ -262,14 +277,22 @@ module Triglav::Agent::Vertica
       @q_table ||= Vertica.quote_identifier(table)
     end
 
+    def q_date
+      @q_date ||= Vertica.quote_identifier(date_column)
+    end
+
+    def q_timestamp
+      @q_timestamp ||= Vertica.quote_identifier(timestamp_column)
+    end
+
     # Value specification:
     # * A value looks like an integer string is treated as an integer.
     # * If you want to treat it as as string, surround with double quote or single quote.
     # * A value does not look like an integer is treated as a string.
     # Operator specification:
     # * Only equality is supported now
-    def q_conditions
-      @q_conditions ||= conditions.map do |col, val|
+    def q_where
+      @q_where ||= where.map do |col, val|
         begin
           val = Integer(val)
         rescue => e
@@ -281,22 +304,6 @@ module Triglav::Agent::Vertica
         end
         "#{Vertica.quote_identifier(col)} = #{Vertica.quote(val)}"
       end.join(' AND ')
-    end
-
-    def q_date
-      @q_date ||= Vertica.quote_identifier(date_column)
-    end
-
-    def q_timestamp
-      @q_timestamp ||= Vertica.quote_identifier(timestamp_column)
-    end
-
-    def date_column
-      $setting.dig(:vertica, :date_column) || 'd'
-    end
-
-    def timestamp_column
-      $setting.dig(:vertica, :timestamp_column) || 't'
     end
   end
 end

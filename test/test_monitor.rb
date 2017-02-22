@@ -120,25 +120,43 @@ if File.exist?(File.join(ROOT, '.env'))
       assert { success }
     end
 
+    def test_query_date
+      resource = build_resource(
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?date=date"
+      )
+      monitor = Monitor.new(connection, resource, last_epoch: 0)
+      q_date = monitor.send(:q_date)
+      assert { q_date == %Q["date"] }
+    end
+
+    def test_query_timestamp
+      resource = build_resource(
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?timestamp=timestamp"
+      )
+      monitor = Monitor.new(connection, resource, last_epoch: 0)
+      q_timestamp = monitor.send(:q_timestamp)
+      assert { q_timestamp == %Q["timestamp"] }
+    end
+
     # Value specification:
     # * A value looks like an integer string is treated as an integer.
     # * If you want to treat it as as string, surround with double quote or single quote.
     # * A value does not look like an integer is treated as a string.
     # Operator specification:
     # * Only equality is supported now
-    def test_query_conditions
+    def test_query_where
       resource = build_resource(
-        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?id=0&uuid='0'&d=2016-12-30"
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?where[id]=0&where[uuid]='0'&where[d]=2016-12-30"
       )
       monitor = Monitor.new(connection, resource, last_epoch: 0)
-      q_conditions = monitor.send(:q_conditions)
-      assert { q_conditions == %Q["id" = 0 AND "uuid" = '0' AND "d" = '2016-12-30'] }
+      q_where = monitor.send(:q_where)
+      assert { q_where == %Q["id" = 0 AND "uuid" = '0' AND "d" = '2016-12-30'] }
     end
 
-    def test_get_events_with_query_conditions
+    def test_get_events_with_query_where
       resource = build_resource(
         unit: 'singular,daily,hourly',
-        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?id=0&uuid='0'"
+        uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?where[id]=0&where[uuid]='0'"
       )
       monitor = Monitor.new(connection, resource, last_epoch: 0)
       success = monitor.process do |events|

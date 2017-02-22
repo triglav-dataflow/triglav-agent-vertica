@@ -12,6 +12,8 @@ defaults: &defaults
       authenticator: local
     timeout: 60
     debugging: false
+    retries: 3
+    retry_interval: 3 # sec
   vertica:
     monitor_interval: 5
     date_column: d

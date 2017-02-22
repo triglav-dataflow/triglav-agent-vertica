@@ -1,6 +1,8 @@
 require 'triglav/agent/vertica/monitor'
 require 'triglav/agent/vertica/connection'
 require 'triglav/agent/vertica/error'
+require 'parallel'
+require 'connection_pool'
 
 module Triglav::Agent
   module Vertica
@@ -19,22 +21,29 @@ module Triglav::Agent
       def process
         success_count = 0
         consecutive_error_count = 0
-        resources.each do |resource|
-          break if stopped?
+        mutex = Mutex.new
+        Parallel.each(resources, in_threads: 8) do |resource|
+          raise Parallel::Break if stopped?
           events = nil
           begin
-            monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
-            monitor.process do |_events|
-              events = _events
-              $logger.info { "send_messages:#{events.map(&:to_hash).to_json}" }
-              api_client.send_messages(events)
+            connection_pool.with do |connection|
+              monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
+              monitor.process do |_events|
+                events = _events
+                $logger.info { "send_messages:#{events.map(&:to_hash).to_json}" }
+                api_client_pool.with {|api_client| api_client.send_messages(events) }
+              end
             end
-            success_count += 1
-            consecutive_error_count = 0
+            mutex.synchronize do
+              success_count += 1
+              consecutive_error_count = 0
+            end
           rescue => e
             log_error(e)
             $logger.info { "failed_events:#{events.map(&:to_hash).to_json}" } if events
-            raise TooManyError if (consecutive_error_count += 1) > self.class.max_consecuitive_error_count
+            mutex.synchronize do
+              raise TooManyError if (consecutive_error_count += 1) > self.class.max_consecuitive_error_count
+            end
           end
         end
         success_count
@@ -46,19 +55,23 @@ module Triglav::Agent
 
       private
 
-      def api_client
-        @api_client ||= ApiClient.new # renew connection
-      end
-
       def resources
         return @resources if @resources
-        @resources = api_client.list_aggregated_resources(resource_uri_prefix) || []
+        @resources = ApiClient.new.list_aggregated_resources(resource_uri_prefix) || []
         $logger.debug { "resource_uri_prefix:#{resource_uri_prefix} resources.size:#{@resources.size}" }
         @resources
       end
 
-      def connection
-        @connection ||= Connection.new(get_connection_info(resource_uri_prefix))
+      def api_client_pool
+        @api_client_pool ||= ConnectionPool.new(size: 8, timeout: 5) {
+          ApiClient.new # renew connection
+        }
+      end
+
+      def connection_pool
+        @connection_pool ||= ConnectionPool.new(size: 8, timeout: 5) {
+          Connection.new(get_connection_info(resource_uri_prefix))
+        }
       end
 
       def get_connection_info(resource_uri_prefix)

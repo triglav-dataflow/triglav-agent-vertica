@@ -23,6 +23,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "triglav-agent"
   spec.add_dependency "triglav_client"
   spec.add_dependency "rack" # Rack::Utils
+  spec.add_dependency "parallel"
+  spec.add_dependency "connection_pool"
 
   spec.add_development_dependency "bundler", "~> 1.11"
   spec.add_development_dependency "rake", "~> 10.0"

@@ -12,6 +12,13 @@ module Triglav::Agent
       def initialize(worker, resource_uri_prefix)
         @worker = worker
         @resource_uri_prefix = resource_uri_prefix
+        @connection_pool = ConnectionPool.new(connection_pool_opts) {
+          Connection.new(get_connection_info(resource_uri_prefix))
+        }
+        @api_client_pool = ConnectionPool.new(connection_pool_opts) {
+          ApiClient.new # renew connection
+        }
+        @mutex = Mutex.new
       end
 
       def self.max_consecuitive_error_count
@@ -21,27 +28,26 @@ module Triglav::Agent
       def process
         success_count = 0
         consecutive_error_count = 0
-        mutex = Mutex.new
-        Parallel.each(resources, in_threads: 8) do |resource|
+        Parallel.each(resources, parallel_opts) do |resource|
           raise Parallel::Break if stopped?
           events = nil
           begin
-            connection_pool.with do |connection|
+            @connection_pool.with do |connection|
               monitor = Monitor.new(connection, resource, last_epoch: $setting.debug? ? 0 : nil)
               monitor.process do |_events|
                 events = _events
                 $logger.info { "send_messages:#{events.map(&:to_hash).to_json}" }
-                api_client_pool.with {|api_client| api_client.send_messages(events) }
+                @api_client_pool.with {|api_client| api_client.send_messages(events) }
               end
             end
-            mutex.synchronize do
+            @mutex.synchronize do
               success_count += 1
               consecutive_error_count = 0
             end
           rescue => e
             log_error(e)
             $logger.info { "failed_events:#{events.map(&:to_hash).to_json}" } if events
-            mutex.synchronize do
+            @mutex.synchronize do
               raise TooManyError if (consecutive_error_count += 1) > self.class.max_consecuitive_error_count
             end
           end
@@ -62,16 +68,28 @@ module Triglav::Agent
         @resources
       end
 
-      def api_client_pool
-        @api_client_pool ||= ConnectionPool.new(size: 8, timeout: 5) {
-          ApiClient.new # renew connection
-        }
+      def parallel_size
+        $setting.dig(:vertica, :parallel, :size) || 1
       end
 
-      def connection_pool
-        @connection_pool ||= ConnectionPool.new(size: 8, timeout: 5) {
-          Connection.new(get_connection_info(resource_uri_prefix))
-        }
+      def parallel_type
+        $setting.dig(:vertica, :parallel, :type) || 'thread'
+      end
+
+      def parallel_opts
+        parallel_type == 'process' ? {in_processes: parallel_size} : {in_threads: parallel_size}
+      end
+
+      def connection_pool_size
+        $setting.dig(:vertica, :connection_pool, :size) || parallel_size
+      end
+
+      def connection_pool_timeout
+        $setting.dig(:vertica, :connection_pool, :timeout) || 60
+      end
+
+      def connection_pool_opts
+        {size: connection_pool_size, timeout: connection_pool_timeout}
       end
 
       def get_connection_info(resource_uri_prefix)

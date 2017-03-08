@@ -23,11 +23,8 @@ module Triglav::Agent
 
       def connection
         return @connection if @connection
-        connection_info = @connection_info.dup
-        connection_info.delete(:resource_pool)
-        connection_info.delete(:memorycap)
         begin
-          @connection = ::Vertica.connect(connection_info)
+          @connection = ::Vertica.connect(connection_params)
         rescue => e
           $logger.error { "Failed to connect #{connection_info[:host]}:#{connection_info[:port]} with #{connection_info[:user]}" }
           raise e
@@ -48,6 +45,20 @@ module Triglav::Agent
         if @connection_info[:memorycap] and !@connection_info[:memorycap].empty?
           @connection.query("set session memorycap = '#{@connection_info[:memorycap]}'")
         end
+      end
+
+      def connection_params
+        params = @connection_info.dup
+        params.delete(:resource_pool)
+        params.delete(:memorycap)
+        params.merge!(global_connection_params)
+      end
+
+      def global_connection_params
+        params = {}
+        params[:interruptable] = $setting.dig(:vertica, :interruptable) if $setting[:vertica].has_key?(:interruptable)
+        params[:read_timeout] = $setting.dig(:vertica, :read_timeout) if $setting[:vertica].has_key?(:read_timeout)
+        params
       end
     end
   end

@@ -11,9 +11,11 @@ test:
       password: <%= ENV['TRIGLAV_PASSWORD'] %>
       authenticator: local
   vertica:
-    watch_interval: 5
+    monitor_interval: 5
     date_column: d
     timestamp_column: t
+    interruptable: true
+    read_timeout: 5
     connection_info:
       "vertica://":
         host: <%= ENV['VERTICA_HOST'] %>

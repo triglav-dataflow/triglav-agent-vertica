@@ -44,15 +44,19 @@ if File.exist?(File.join(ROOT, '.env'))
       }.merge(params))
     end
 
+    def resource_uri_prefix
+      'vertica://'
+    end
+
     def test_process
       resource = build_resource
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       assert_nothing_raised { monitor.process }
     end
 
     def test_get_hourly_events
       resource = build_resource(unit: 'hourly')
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == resource.span_in_days * 24 }
@@ -67,7 +71,7 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_daily_events
       resource = build_resource(unit: 'daily')
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == resource.span_in_days }
@@ -82,7 +86,7 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_singular_events
       resource = build_resource(unit: 'singular')
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == 1 }
@@ -97,7 +101,7 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_daily_hourly_events
       resource = build_resource(unit: 'daily,hourly')
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == resource.span_in_days * 24 + resource.span_in_days }
@@ -109,7 +113,7 @@ if File.exist?(File.join(ROOT, '.env'))
 
     def test_get_singular_daily_hourly_events
       resource = build_resource(unit: 'singular,daily,hourly')
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == resource.span_in_days * 24 + resource.span_in_days + 1 }
@@ -124,7 +128,7 @@ if File.exist?(File.join(ROOT, '.env'))
       resource = build_resource(
         uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?date=date"
       )
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       q_date = monitor.send(:q_date)
       assert { q_date == %Q["date"] }
     end
@@ -133,7 +137,7 @@ if File.exist?(File.join(ROOT, '.env'))
       resource = build_resource(
         uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?timestamp=timestamp"
       )
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       q_timestamp = monitor.send(:q_timestamp)
       assert { q_timestamp == %Q["timestamp"] }
     end
@@ -148,7 +152,7 @@ if File.exist?(File.join(ROOT, '.env'))
       resource = build_resource(
         uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?where[id]=0&where[uuid]='0'&where[d]=2016-12-30"
       )
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       q_where = monitor.send(:q_where)
       assert { q_where == %Q["id" = 0 AND "uuid" = '0' AND "d" = '2016-12-30'] }
     end
@@ -158,7 +162,7 @@ if File.exist?(File.join(ROOT, '.env'))
         unit: 'singular,daily,hourly',
         uri: "vertica://#{host}:#{port}/#{db}/#{schema}/#{table}?where[id]=0&where[uuid]='0'"
       )
-      monitor = Monitor.new(connection, resource)
+      monitor = Monitor.new(connection, resource_uri_prefix, resource)
       success = monitor.process do |events|
         assert { events != nil}
         assert { events.size == 3 }

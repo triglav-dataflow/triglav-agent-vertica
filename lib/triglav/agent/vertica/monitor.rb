@@ -24,7 +24,7 @@ module Triglav::Agent
         @connection = connection
         @resource_uri_prefix = resource_uri_prefix
         @resource = resource
-        @status = Triglav::Agent::Status.new(resource_uri_prefix, resource)
+        @status = Triglav::Agent::Status.new(resource_uri_prefix, resource.uri)
         @periodic_last_epoch = $setting.debug? ? 0 : get_from_status_file(:periodic_last_epoch)
         @singular_last_epoch = $setting.debug? ? 0 : get_from_status_file(:singular_last_epoch)
       end

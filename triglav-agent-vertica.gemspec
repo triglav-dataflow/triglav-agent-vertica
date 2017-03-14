@@ -6,11 +6,11 @@ require 'triglav/agent/vertica/version'
 Gem::Specification.new do |spec|
   spec.name          = "triglav-agent-vertica"
   spec.version       = Triglav::Agent::Vertica::VERSION
-  spec.authors       = ["Naotoshi Seo"]
-  spec.email         = ["sonots@gmail.com"]
+  spec.authors       = ["Triglav Team"]
+  spec.email         = ["triglav_admin_my@gmail.com"]
 
-  spec.summary       = %q{Triglav Agent for Vertica.}
-  spec.description   = %q{Triglav Agent for Vertica.}
+  spec.summary       = %q{Vertica agent for Triglav, data-driven workflow tool.}
+  spec.description   = %q{Vertica agent for Triglav, data-driven workflow tool.}
   spec.homepage      = "https://github.com/triglav-dataflow/triglav-agent-vertica"
   spec.license       = "MIT"
 

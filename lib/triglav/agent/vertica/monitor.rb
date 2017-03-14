@@ -8,9 +8,10 @@ require 'rack/utils'
 module Triglav::Agent
   module Vertica
     class Monitor < Base::Monitor
-      attr_reader :connection, :resource, :periodic_last_epoch, :singular_last_epoch
+      attr_reader :connection, :resource_uri_prefix, :resource, :periodic_last_epoch, :singular_last_epoch
 
       # @param [Triglav::Agent::Vertica::Connection] connection
+      # @param [String] resource_uri_prefix
       # @param [TriglavClient::ResourceResponse] resource
       # resource:
       #   uri: vertica://host/database/schema/table
@@ -19,9 +20,11 @@ module Triglav::Agent
       #   span_in_days: 32
       #
       # View is not supported
-      def initialize(connection, resource)
+      def initialize(connection, resource_uri_prefix, resource)
         @connection = connection
+        @resource_uri_prefix = resource_uri_prefix
         @resource = resource
+        @status = Triglav::Agent::Status.new(resource_uri_prefix, resource.uri)
         @periodic_last_epoch = $setting.debug? ? 0 : get_from_status_file(:periodic_last_epoch)
         @singular_last_epoch = $setting.debug? ? 0 : get_from_status_file(:singular_last_epoch)
       end
@@ -127,19 +130,11 @@ module Triglav::Agent
       end
 
       def update_status_file(key, last_epoch)
-        Triglav::Agent::StorageFile.set(
-          $setting.status_file,
-          [resource.uri.to_sym, key.to_sym],
-          last_epoch
-        )
+        @status.set(key.to_sym, last_epoch)
       end
 
       def get_from_status_file(key)
-        Triglav::Agent::StorageFile.getsetnx(
-          $setting.status_file,
-          [resource.uri.to_sym, key.to_sym],
-          get_current_epoch
-        )
+        @status.getsetnx(key.to_sym, get_current_epoch)
       end
 
       def get_current_epoch
